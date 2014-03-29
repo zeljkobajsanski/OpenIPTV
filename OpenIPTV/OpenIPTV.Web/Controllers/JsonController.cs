@@ -37,18 +37,19 @@ namespace OpenIPTV.Web.Controllers
             return new EmptyResult();
         }
 
-        public JsonResult VratiEmisije(string tip)
+        public JsonResult VratiEmisije(string timestamp, string tip, int? skip, int? take)
         {
             Response.Headers.Add("Access-Control-Allow-Origin", "*");
             using (var ctx = new DataContext())
             {
-                var now = GetTime();
+                var now = timestamp != null ? DateTime.Parse(timestamp) : GetTime();
                 var datum = now.Date;
                 var query = ctx.Emisije.Include(x => x.Kanal).Where(x => x.Datum == datum).OrderBy(x => x.Sat).ThenBy(x => x.Minut).ThenBy(x => x.Kanal.Broj).AsQueryable();
-                if (tip != null)
+                if (!string.IsNullOrEmpty(tip))
                 {
                     query = query.Where(x => x.Tip == tip);
                 }
+                
                 var emisije = query.ToArray();
                 var emisijePoKanalima = emisije.GroupBy(x => x.KanalId);
                 foreach (var emisijeKanala in emisijePoKanalima)
@@ -67,6 +68,10 @@ namespace OpenIPTV.Web.Controllers
                         prethodna = emisijaKanala;
                     }
                 }
+                if (skip.HasValue && take.HasValue)
+                {
+                    emisije = emisije.Skip(skip.Value).Take(take.Value).ToArray();
+                }
                 var json = from e in emisije
                            select new
                            {
@@ -79,7 +84,7 @@ namespace OpenIPTV.Web.Controllers
                                aktivna = e.SadaNaProgramu,
                                logo = e.Kanal.Logo
                            };
-                return Json(json.ToArray(), JsonRequestBehavior.AllowGet);
+                return Json(new{ timestamp = now.ToString("dd.MM.yyyy HH:mm"), program = json.ToArray() }, JsonRequestBehavior.AllowGet);
             }
         }
 
