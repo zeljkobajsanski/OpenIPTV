@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Web.Mvc;
 using OpenIPTV.Web.Models;
 using System.Linq;
@@ -16,6 +17,7 @@ namespace OpenIPTV.Web.Controllers
                 var datum = GetTime().Date;
                 if (ctx.Emisije.Any(x => x.Datum == datum)) return new EmptyResult();
                 var kanali = ctx.Kanal.ToArray();
+                ctx.Database.ExecuteSqlCommand("DELETE Emisije");
                 var harvester = new Harvester();
                 foreach (var kanal in kanali)
                 {
@@ -68,11 +70,23 @@ namespace OpenIPTV.Web.Controllers
                         prethodna = emisijaKanala;
                     }
                 }
+                var nadjenaPrva = false;
+                var filtriraneEmisije = new List<Emisija>();
+                foreach (var emisija in emisije)
+                {
+                    if (!nadjenaPrva && emisija.SadaNaProgramu)
+                    {
+                        nadjenaPrva = true;
+                    }
+                    if (!nadjenaPrva) continue;
+                    filtriraneEmisije.Add(emisija);
+                }
                 if (skip.HasValue && take.HasValue)
                 {
-                    emisije = emisije.Skip(skip.Value).Take(take.Value).ToArray();
+                    filtriraneEmisije = filtriraneEmisije.Skip(skip.Value).Take(take.Value).ToList();
                 }
-                var json = from e in emisije
+                
+                var json = from e in filtriraneEmisije
                            select new
                            {
                                id = e.Id,
